@@ -1,18 +1,16 @@
 package team.morpheus.launcher.starters.impl;
 
-import sun.management.VMManagement;
 import team.morpheus.launcher.Launcher;
 import team.morpheus.launcher.Main;
+import team.morpheus.launcher.logging.MyLogger;
 import team.morpheus.launcher.model.products.MojangProduct;
 import team.morpheus.launcher.starters.ILibraryManager;
 import team.morpheus.launcher.utils.OSUtils;
-import team.morpheus.launcher.logging.MyLogger;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,21 +74,14 @@ public class ClasspathLauncher implements ILibraryManager {
         if (vanilla.arguments != null && vanilla.arguments.jvm != null) {
             /* Setup vanilla args */
             for (Object o : vanilla.arguments.jvm) {
-                String arg = o.toString()
-                        .replace("${natives_directory}", libraryPath) /* Natives directory (.minecraft/versions/<version>/natives) */
-                        .replace("${classpath}", classPath)
-                        .replace("${launcher_name}", Main.name)
-                        .replace("${launcher_version}", Main.version);
+                String arg = o.toString().replace("${natives_directory}", libraryPath) /* Natives directory (.minecraft/versions/<version>/natives) */.replace("${classpath}", classPath).replace("${launcher_name}", Main.name).replace("${launcher_version}", Main.version);
                 if (arg.contains("{rules=[{")) continue;
                 command.add(arg);
             }
             /* Append modloader args */
             if (!getGame().equals(vanilla) && getGame() != null && getGame().arguments != null && getGame().arguments.jvm != null) {
                 for (Object o : getGame().arguments.jvm) {
-                    String arg = o.toString()
-                            .replace("${version_name}", getGame().id) /* Forge version name */
-                            .replace("${classpath_separator}", Character.toString(separator))
-                            .replace("${library_directory}", String.format("%s/libraries", Launcher.env.getGameFolder().getPath())); /* .minecraft/libraries */
+                    String arg = o.toString().replace("${version_name}", getGame().id) /* Forge version name */.replace("${classpath_separator}", Character.toString(separator)).replace("${library_directory}", String.format("%s/libraries", Launcher.env.getGameFolder().getPath())); /* .minecraft/libraries */
                     command.add(arg);
                 }
             }
@@ -130,14 +121,10 @@ public class ClasspathLauncher implements ILibraryManager {
     private List<String> getActiveJavaAgents() {
         List<String> agents = new ArrayList<>();
         try {
-            Field jvmField = ManagementFactory.getRuntimeMXBean().getClass().getDeclaredField("jvm");
-            jvmField.setAccessible(true);
-            VMManagement jvm = (VMManagement) jvmField.get(ManagementFactory.getRuntimeMXBean());
-            List<String> inputArguments = jvm.getVmArguments();
-
+            List<String> inputArguments = ManagementFactory.getRuntimeMXBean().getInputArguments();
             for (String arg : inputArguments) {
                 if (arg.startsWith("-javaagent:") && !arg.contains("debugger-agent.jar")) {
-                    log.info("Detected agent to passtrough: " + arg);
+                    log.info("Detected agent to passthrough: " + arg);
                     agents.add(arg);
                 }
             }
