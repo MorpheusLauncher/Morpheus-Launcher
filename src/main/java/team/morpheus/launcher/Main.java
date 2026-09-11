@@ -13,7 +13,7 @@ import team.morpheus.launcher.utils.OSUtils;
 
 public class Main {
 
-    public static final String name = "Morpheus", version = "v4.5.0", build = "22_08_2026";
+    public static final String name = "Morpheus", version = "v4.5.0", build = "11_09_2026";
     private static final MyLogger log = new MyLogger(Main.class);
 
     @Getter
@@ -97,6 +97,19 @@ public class Main {
 
     public static String getForgeInstallerURL() { /* forge installer base url */
         return "https://maven.minecraftforge.net/net/minecraftforge/forge/";
+    }
+
+    /* ----- NeoForge ----- */
+    public static String getNeoForgeURL() {
+        return "https://maven.neoforged.net";
+    }
+
+    public static String getNeoForgeInstallURL() {
+        return String.format(getNeoForgeURL(), "%s/releases/net/neoforged/");
+    }
+
+    public static String getNeoForgeVersionsURL() {
+        return String.format(getNeoForgeURL(), "%s/api/maven/versions/releases/net/neoforged/");
     }
 
     /* ----- OptiFine ----- */

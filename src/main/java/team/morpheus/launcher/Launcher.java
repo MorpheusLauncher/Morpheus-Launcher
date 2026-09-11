@@ -108,6 +108,9 @@ public class Launcher {
                 doFabricSetup(mcLowercase, jsonFile);
             } else if (mcLowercase.contains("optiforge")) {
                 doOptiForgeSetup(mcLowercase, jsonFile);
+            } else if (mcLowercase.contains("neoforge")) {
+                team.morpheus.launcher.utils.modutils.NeoForgeUtils.doNeoForgeSetup(mcLowercase, jsonFile);
+                overwriteJsonId(variables.getMcVersion(), jsonFile);
             } else if (mcLowercase.contains("forge")) {
                 doForgeSetup(mcLowercase, jsonFile);
                 overwriteJsonId(variables.getMcVersion(), jsonFile);
@@ -629,7 +632,9 @@ public class Launcher {
 
     private static String buildRPCstatus(String mcVersion, String gameVersion) {
         String gameType = "Vanilla";
-        if (mcVersion.contains("forge")) {
+        if (mcVersion.contains("neoforge")) {
+            gameType = "NeoForge";
+        } else if (mcVersion.contains("forge")) {
             gameType = "Forge";
         } else if (mcVersion.contains("fabric")) {
             gameType = "Fabric";
