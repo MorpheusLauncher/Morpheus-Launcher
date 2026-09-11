@@ -105,11 +105,11 @@ public class Main {
     }
 
     public static String getNeoForgeInstallURL() {
-        return String.format(getNeoForgeURL(), "%s/releases/net/neoforged/");
+        return String.format("%s/releases/net/neoforged/", getNeoForgeURL());
     }
 
     public static String getNeoForgeVersionsURL() {
-        return String.format(getNeoForgeURL(), "%s/api/maven/versions/releases/net/neoforged/");
+        return String.format("%s/api/maven/versions/releases/net/neoforged/", getNeoForgeURL());
     }
 
     /* ----- OptiFine ----- */
