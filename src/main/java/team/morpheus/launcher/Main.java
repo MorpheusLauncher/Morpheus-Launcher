@@ -13,7 +13,7 @@ import team.morpheus.launcher.utils.OSUtils;
 
 public class Main {
 
-    public static final String name = "Morpheus", version = "v4.5.0", build = "11_09_2026";
+    public static final String name = "Morpheus", version = "v4.5.0", build = "12_09_2026";
     private static final MyLogger log = new MyLogger(Main.class);
 
     @Getter

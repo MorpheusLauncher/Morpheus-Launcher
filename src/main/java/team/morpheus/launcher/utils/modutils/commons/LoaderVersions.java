@@ -1,10 +1,8 @@
 package team.morpheus.launcher.utils.modutils.commons;
 
-import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.net.URL;
-import java.nio.file.Files;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -14,49 +12,46 @@ public final class LoaderVersions {
     private LoaderVersions() {
     }
 
-    public static String minecraftVersion(String requested) throws IOException {
-        Matcher matcher = Pattern.compile("^([0-9]+(?:\\.[0-9]+){1,2})(?:-|$)").matcher(requested);
-        if (!matcher.find()) throw new IOException("Expected a Minecraft version prefix: " + requested);
-        return matcher.group(1);
-    }
-
-    public static String loaderVersion(String requested, String loader) throws IOException {
-        String value = requested.toLowerCase(Locale.ROOT);
-        int index = value.indexOf(loader);
-        if (index < 0) throw new IOException("Missing loader name: " + requested);
-        String suffix = value.substring(index + loader.length());
-        if (suffix.startsWith("-")) suffix = suffix.substring(1);
-        if (suffix.isEmpty()) return null;
-        if (!suffix.matches("[0-9]+(?:\\.[0-9]+)+(?:-[a-z0-9.]+)?")) {
-            throw new IOException("Invalid " + loader + " version: " + suffix);
-        }
-        return suffix;
+    public static Request parse(String requested, String loader) throws IOException {
+        if (requested == null) throw new IOException("Missing modloader version");
+        String name = loader.equals("forge") ? "(?:opti)?forge" : Pattern.quote(loader);
+        Pattern pattern = Pattern.compile("^(?:([0-9]+(?:\\.[0-9]+){1,2})-)?" + name + "(?:-?([0-9]+(?:\\.[0-9]+)+(?:-[a-z0-9.]+)?))?$");
+        Matcher matcher = pattern.matcher(requested.toLowerCase(Locale.ROOT));
+        if (!matcher.matches()) throw new IOException("Invalid " + loader + " request: " + requested);
+        Request request = new Request(matcher.group(1), matcher.group(2));
+        if (request.minecraft == null && request.version == null)
+            throw new IOException("Specify Minecraft or an exact " + loader + " version");
+        return request;
     }
 
     public static String latest(List<String> candidates, String requested) throws IOException {
         if (candidates.isEmpty()) throw new IOException("No installer matches " + requested);
-        candidates.sort(LoaderVersions::compare);
-        return candidates.get(candidates.size() - 1);
+        return Collections.max(candidates, LoaderVersions::compare);
     }
 
-    private static int compare(String left, String right) {
+    /**
+     * Numeric components sort numerically; release builds sort after their qualifiers.
+     */
+    public static int compare(String left, String right) {
         String[] a = left.split("[.-]");
         String[] b = right.split("[.-]");
-        for (int i = 0; i < Math.min(a.length, b.length); i++) {
+        for (int i = 0; i < Math.max(a.length, b.length); i++) {
+            if (i == a.length) return b[i].matches("\\d+") ? -1 : 1;
+            if (i == b.length) return a[i].matches("\\d+") ? 1 : -1;
             int result = a[i].matches("\\d+") && b[i].matches("\\d+") ? new BigInteger(a[i]).compareTo(new BigInteger(b[i])) : a[i].compareTo(b[i]);
             if (result != 0) return result;
         }
-        // For the same numeric version, a release sorts after its prerelease.
-        return Integer.compare(b.length, a.length);
+        // Equivalent numeric spellings still have a stable order.
+        return left.compareTo(right);
     }
 
-    public static File downloadInstaller(String base, String artifact, String version) throws IOException {
-        File cache = new File(System.getProperty("java.io.tmpdir"), "morpheus-installers/" + artifact);
-        Files.createDirectories(cache.toPath());
-        File installer = ModLoaderInstaller.safeFile(cache, artifact + "-" + version + "-installer.jar");
-        URL url = new URL(base + version + "/" + installer.getName());
-        // Always download atomically: a prior partial installer must not poison the cache.
-        ModLoaderInstaller.download(url, installer, null);
-        return installer;
+    public static class Request {
+        public final String minecraft;
+        public final String version;
+
+        private Request(String minecraft, String version) {
+            this.minecraft = minecraft;
+            this.version = version;
+        }
     }
 }

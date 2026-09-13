@@ -1,12 +1,10 @@
 package team.morpheus.launcher.utils.modutils;
 
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 import team.morpheus.launcher.Launcher;
 import team.morpheus.launcher.Main;
-import team.morpheus.launcher.utils.Utils;
+import team.morpheus.launcher.model.modloaders.InstallerProfile;
+import team.morpheus.launcher.model.modloaders.NeoForgeProduct;
+import team.morpheus.launcher.utils.modutils.commons.InstallerFiles;
 import team.morpheus.launcher.utils.modutils.commons.LoaderVersions;
 import team.morpheus.launcher.utils.modutils.commons.ModLoaderInstaller;
 
@@ -17,55 +15,51 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * NeoForge discovery, including the original Minecraft 1.20.1 artifact.
+ * Resolves published NeoForge artifacts, then checks the installer's Minecraft version.
  */
-public final class NeoForgeUtils {
+public class NeoForgeUtils {
 
-    private NeoForgeUtils() {
+    public static void doNeoForgeSetup(String requested, File jsonFile) throws IOException, InterruptedException {
+        LoaderVersions.Request request = LoaderVersions.parse(requested, "neoforge");
+        List<NeoForgeProduct.Release> candidates = new ArrayList<>();
+        // Both Maven artifact names are published by NeoForge; each supplies its own catalog.
+        String[] artifactList = new String[]{"forge", "neoforge"};
+        for (String artifact : artifactList) {
+            NeoForgeProduct catalog = InstallerFiles.readJson(new URL(Main.getNeoForgeVersionsURL() + artifact), NeoForgeProduct.class);
+            candidates.addAll(selectVersions(request, artifact, catalog));
+        }
+        File installer = resolveInstaller(request, candidates, Main.getNeoForgeInstallURL());
+        new ModLoaderInstaller(installer, Launcher.env.getGameFolder()).install(jsonFile);
     }
 
-    public static void doNeoForgeSetup(String requested, File jsonFile) throws IOException, ParseException, InterruptedException {
-        String minecraft = Character.isDigit(requested.charAt(0)) ? LoaderVersions.minecraftVersion(requested) : null;
-        String artifact = "1.20.1".equals(minecraft) ? "forge" : "neoforge";
-        String base = Main.getNeoForgeInstallURL() + artifact + "/";
-        String metadata = Utils.makeGetRequest(new URL(Main.getNeoForgeVersionsURL() + artifact));
-        String version = selectVersion(requested, metadata);
-        File installer = LoaderVersions.downloadInstaller(base, artifact, version);
-        ModLoaderInstaller.install(installer, jsonFile, Launcher.env.getGameFolder());
+    static File resolveInstaller(LoaderVersions.Request request, List<NeoForgeProduct.Release> candidates, String repository) throws IOException {
+        if (request.minecraft == null && candidates.size() > 1)
+            throw new IOException("Ambiguous NeoForge version " + request.version + "; specify Minecraft too");
+        candidates.sort((left, right) -> {
+            int order = LoaderVersions.compare(right.loaderVersion, left.loaderVersion);
+            if (order == 0) order = left.artifact.compareTo(right.artifact);
+            return order == 0 ? left.version.compareTo(right.version) : order;
+        });
+        for (NeoForgeProduct.Release release : candidates) {
+            URL url = new URL(String.format("%s%s/%s/%s-%s-installer.jar", repository, release.artifact, release.version, release.artifact, release.version));
+            File installer = InstallerFiles.downloadInstaller(url, release.coordinate(), null);
+            InstallerProfile profile = ModLoaderInstaller.readProfile(installer);
+            if (profile.minecraft == null) throw new IOException("Missing Minecraft version in NeoForge profile");
+            if (request.minecraft != null && !request.minecraft.equals(profile.minecraft)) continue;
+            return installer;
+        }
+        throw new IOException("No NeoForge installer matches Minecraft " + request.minecraft + " / loader " + request.version);
     }
 
-    static String selectVersion(String requested, String metadata) throws IOException {
-        String minecraft = Character.isDigit(requested.charAt(0)) ? LoaderVersions.minecraftVersion(requested) : null;
-        String wanted = LoaderVersions.loaderVersion(requested, "neoforge");
-        if (minecraft == null && wanted == null)
-            throw new IOException("Specify Minecraft or an exact NeoForge version");
-        String prefix = null;
-        if (minecraft != null) {
-            if (minecraft.equals("1.20.1")) prefix = "1.20.1-";
-            else if (minecraft.startsWith("1.")) {
-                String[] parts = minecraft.split("\\.");
-                prefix = parts[1] + "." + (parts.length > 2 ? parts[2] : "0") + ".";
-            } else {
-                prefix = minecraft + ".";
-            }
+    static List<NeoForgeProduct.Release> selectVersions(LoaderVersions.Request request, String artifact, NeoForgeProduct catalog) throws IOException {
+        if (catalog.versions == null) throw new IOException("NeoForge catalog has no versions");
+        List<NeoForgeProduct.Release> candidates = new ArrayList<>();
+        for (String version : catalog.versions) {
+            NeoForgeProduct.Release release = new NeoForgeProduct.Release(artifact, version);
+            if (request.version != null && !request.version.equals(release.loaderVersion)) continue;
+            if (request.version == null && request.minecraft != null && !release.mayTarget(request.minecraft)) continue;
+            candidates.add(release);
         }
-        try {
-            JSONObject response = (JSONObject) new JSONParser().parse(metadata);
-            JSONArray entries = (JSONArray) response.get("versions");
-            if (entries == null) throw new IOException("NeoForge version response has no versions array");
-            List<String> candidates = new ArrayList<>();
-            for (Object entry : entries) {
-                String version = entry.toString().trim();
-                if (!version.matches("[0-9]+(?:\\.[0-9]+)+(?:-[a-zA-Z0-9.-]+)?")) continue;
-                if (prefix != null && !version.startsWith(prefix)) continue;
-                String comparable = version.startsWith("1.20.1-") ? version.substring("1.20.1-".length()) : version;
-                if (wanted == null || wanted.equals(comparable)) candidates.add(version);
-            }
-            return LoaderVersions.latest(candidates, requested);
-        } catch (IOException e) {
-            throw e;
-        } catch (ParseException | ClassCastException e) {
-            throw new IOException("Cannot parse NeoForge version metadata", e);
-        }
+        return candidates;
     }
 }

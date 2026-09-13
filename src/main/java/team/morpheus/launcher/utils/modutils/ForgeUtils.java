@@ -1,12 +1,9 @@
 package team.morpheus.launcher.utils.modutils;
 
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 import team.morpheus.launcher.Launcher;
 import team.morpheus.launcher.Main;
-import team.morpheus.launcher.utils.Utils;
+import team.morpheus.launcher.model.modloaders.ForgeProduct;
+import team.morpheus.launcher.utils.modutils.commons.InstallerFiles;
 import team.morpheus.launcher.utils.modutils.commons.LoaderVersions;
 import team.morpheus.launcher.utils.modutils.commons.ModLoaderInstaller;
 
@@ -17,38 +14,36 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Forge version discovery; execution is shared with NeoForge.
+ * Fetches Forge's catalog and delegates installation to the shared profile executor.
  */
 public class ForgeUtils {
 
-    public static void doForgeSetup(String requested, File jsonFile) throws IOException, ParseException, InterruptedException {
-        String metadata = Utils.makeGetRequest(new URL(Main.getForgeVersionsURL()));
-        String version = selectVersion(requested, metadata);
-        File installer = LoaderVersions.downloadInstaller(Main.getForgeInstallerURL(), "forge", version);
-        doForgeUnpack(installer, jsonFile, version, Launcher.env.getGameFolder());
+    public static void doForgeSetup(String requested, File jsonFile) throws IOException, InterruptedException {
+        ForgeProduct catalog = InstallerFiles.readJson(new URL(Main.getForgeVersionsURL()), ForgeProduct.class);
+        String version = selectVersion(requested, catalog);
+        URL url = new URL(String.format("%s%s/forge-%s-installer.jar", Main.getForgeInstallerURL(), version, version));
+        File installer = InstallerFiles.downloadInstaller(url, "net.minecraftforge:forge:" + version + ":installer", null);
+        new ModLoaderInstaller(installer, Launcher.env.getGameFolder()).install(jsonFile);
     }
 
-    static String selectVersion(String requested, String metadata) throws ParseException, IOException {
-        JSONObject versions = (JSONObject) new JSONParser().parse(metadata);
-        String minecraft = LoaderVersions.minecraftVersion(requested);
-        JSONArray available = (JSONArray) versions.get(minecraft);
-        if (available == null) throw new IOException("No Forge versions for Minecraft " + minecraft);
-        String wanted = LoaderVersions.loaderVersion(requested, "forge");
+    static String selectVersion(String requested, ForgeProduct catalog) throws IOException {
+        LoaderVersions.Request request = LoaderVersions.parse(requested, "forge");
+        if (request.minecraft == null) throw new IOException("Specify a Minecraft version for Forge");
+        List<String> available = catalog.get(request.minecraft);
+        if (available == null) throw new IOException("No Forge versions for Minecraft " + request.minecraft);
+        String prefix = request.minecraft + "-";
+        String suffix = "-" + request.minecraft;
+        String wanted = request.version;
+        if (wanted != null && wanted.endsWith(suffix)) wanted = wanted.substring(0, wanted.length() - suffix.length());
         List<String> matches = new ArrayList<>();
-        for (Object entry : available) {
-            String full = entry.toString();
-            String prefix = minecraft + "-";
+        for (String full : available) {
             if (!full.startsWith(prefix)) continue;
-            String forge = full.substring(prefix.length());
-            // Some legacy artifacts repeat the Minecraft version after the Forge build,
-            // e.g. 1.8.9-11.15.1.2318-1.8.9.
-            if (wanted == null || forge.equals(wanted) || forge.equals(wanted + "-" + minecraft)) matches.add(full);
+            String version = full.substring(prefix.length());
+            // Maven can repeat the Minecraft version after the loader build.
+            if (version.endsWith(suffix)) version = version.substring(0, version.length() - suffix.length());
+            if (wanted == null || version.equals(wanted) || version.startsWith(wanted + "."))
+                matches.add(full);
         }
         return LoaderVersions.latest(matches, requested);
-    }
-
-    // Kept for callers that already have a Forge installer, including OptiForge.
-    public static void doForgeUnpack(File installer, File jsonFile, String forgeLibName, File gameFolder) throws IOException, ParseException, InterruptedException {
-        ModLoaderInstaller.install(installer, jsonFile, gameFolder);
     }
 }
