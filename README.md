@@ -29,7 +29,8 @@ The project is designed around portability, scalability and long-term compatibil
 * ✅ **Fabric support**
 * ✅ **OptiFine support**
 * ✅ **Forge support***
-* ✅ **Automatic Fabric, Forge and OptiFine installation**
+* ✅ **NeoForge support***
+* ✅ **Automatic Fabric, Forge, NeoForge and OptiFine installation**
 * ✅ **Windows, macOS and Linux**
 * ✅ **x86, ARM® and RISC-V support**
 * ✅ **Premium Microsoft accounts**
