@@ -281,7 +281,7 @@ public class Launcher {
     private void makeModloaderCompatibility(List<URL> paths, File jarFile) throws URISyntaxException {
         StringBuilder classPath = new StringBuilder();
         for (URL path : paths) {
-            classPath.append(new File(path.toURI()).getPath()).append(";");
+            classPath.append(new File(path.toURI()).getPath()).append(File.pathSeparator);
         }
         classPath.append(new File(jarFile.toURI()).getPath());
         System.setProperty("java.class.path", classPath.toString());
