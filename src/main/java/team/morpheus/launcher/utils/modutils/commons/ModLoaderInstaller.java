@@ -64,7 +64,7 @@ public class ModLoaderInstaller {
             try {
                 deleteDirectory(work);
             } catch (IOException e) {
-                log.warn("Cannot remove installer temporary files: " + e.getMessage());
+                log.warn("Cannot remove installer temporary files", e);
             }
         }
     }

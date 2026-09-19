@@ -3,7 +3,6 @@ package team.morpheus.launcher;
 import lombok.Getter;
 import lombok.Setter;
 import team.morpheus.launcher.model.LauncherVariables;
-import team.morpheus.launcher.model.MojangSession;
 import team.morpheus.launcher.model.products.MojangProduct;
 import team.morpheus.launcher.model.products.MorpheusProduct;
 

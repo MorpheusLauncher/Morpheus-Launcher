@@ -105,7 +105,7 @@ public class ClasspathLauncher implements ILibraryManager {
             String line;
             while ((line = reader.readLine()) != null) System.out.println(line);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Cannot read game standard output", e);
         }
     }
 
@@ -114,7 +114,7 @@ public class ClasspathLauncher implements ILibraryManager {
             String line;
             while ((line = reader.readLine()) != null) System.err.println(line);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Cannot read game error output", e);
         }
     }
 
@@ -129,7 +129,7 @@ public class ClasspathLauncher implements ILibraryManager {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Cannot inspect active Java agents", e);
         }
         return agents;
     }

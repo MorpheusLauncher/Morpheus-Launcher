@@ -12,10 +12,7 @@ import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.stream.Stream;
@@ -136,8 +133,10 @@ public final class InstallerFiles {
     }
 
     static void writeJson(File target, JsonObject json) throws IOException {
-        try (InputStream stream = new ByteArrayInputStream(json.toString().getBytes(StandardCharsets.UTF_8))) {
-            copy(stream, target.toPath(), null);
+        File parent = target.getParentFile();
+        if (parent != null) Files.createDirectories(parent.toPath());
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(target), StandardCharsets.UTF_8)) {
+            writer.write(json.toString());
         }
     }
 
@@ -149,14 +148,52 @@ public final class InstallerFiles {
             Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);
             if (sha1 != null && !sha1.isEmpty() && !valid(temporary.toFile(), sha1))
                 throw new IOException("Checksum mismatch: " + target);
-            try {
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-            }
+            moveIntoPlace(temporary, target);
         } finally {
             Files.deleteIfExists(temporary);
         }
+    }
+
+    /**
+     * Atomically publishes a completed file when possible. Some Windows file
+     * providers report AccessDeniedException for an atomic replacement even
+     * though the regular replacement is allowed, so keep a safe fallback.
+     */
+    private static void moveIntoPlace(Path temporary, Path target) throws IOException {
+        IOException lastFailure = null;
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                return;
+            } catch (AtomicMoveNotSupportedException unsupported) {
+                try {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                    return;
+                } catch (IOException fallbackFailure) {
+                    fallbackFailure.addSuppressed(unsupported);
+                    lastFailure = fallbackFailure;
+                }
+            } catch (AccessDeniedException locked) {
+                lastFailure = locked;
+                try {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                    return;
+                } catch (IOException fallbackFailure) {
+                    fallbackFailure.addSuppressed(locked);
+                    lastFailure = fallbackFailure;
+                }
+            }
+
+            if (attempt < 5) {
+                try {
+                    Thread.sleep(200L * attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while publishing " + target, interrupted);
+                }
+            }
+        }
+        throw lastFailure;
     }
 
     static void deleteDirectory(Path directory) throws IOException {

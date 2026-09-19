@@ -2,16 +2,11 @@ package team.morpheus.launcher.utils;
 
 import team.morpheus.launcher.Main;
 import team.morpheus.launcher.logging.MyLogger;
-import team.morpheus.launcher.utils.modutils.ForgeUtils;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -77,8 +72,7 @@ public class Utils {
             zipInputStream.closeEntry();
             zipInputStream.close();
         } catch (Exception e) {
-            log.error(e.getMessage());
-            e.printStackTrace();
+            log.error("Native extraction failed", e);
         }
     }
 }

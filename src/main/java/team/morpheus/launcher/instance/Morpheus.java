@@ -31,7 +31,7 @@ public class Morpheus {
         try {
             jsonResponse = Utils.makeGetRequest(new URL(indexUrl));
         } catch (IOException e) {
-            log.error("Could not find morpheus website");
+            log.error("Could not reach morpheus website", e);
             return;
         }
         MorpheusProduct prods = gson.fromJson(jsonResponse, MorpheusProduct.class);
@@ -47,7 +47,7 @@ public class Morpheus {
             }
         }
         if (morpheusProduct == null) {
-            log.error("Could not find morpheus version");
+            log.error("Could not find morpheus version: " + version);
             return;
         }
 

@@ -73,7 +73,7 @@ public class Launcher {
 
             env.setTarget(VersionUtils.findVersion(env.getVanilla(), targetName));
         } catch (Exception e) {
-            log.error("Cannot download/parse mojang versions json");
+            log.error("Cannot download/parse Mojang versions JSON", e);
         }
 
         // Make .minecraft/
@@ -427,6 +427,7 @@ public class Launcher {
                     tasks.add(new DownloadFileTask(downloadsource, libfile.getPath()));
                 }
             } catch (Exception e) {
+                log.warn("Unable to check optional library " + downloadsource, e);
             }
 
             if (!toLoad.contains(libfile.toURI().toURL())) toLoad.add(libfile.toURI().toURL());
@@ -472,6 +473,7 @@ public class Launcher {
                     log.debug(String.format("Skipped duplicate native %s", url));
                 }
             } catch (MalformedURLException e) {
+                log.error("Invalid native library URL: " + url, e);
                 throw new RuntimeException(e);
             }
         };
@@ -575,7 +577,7 @@ public class Launcher {
         /* Download assets indexes from mojang repo */
         File indexesPath = new File(String.format("%s/indexes/%s.json", env.getAssetsFolder().getPath(), game.assetIndex.id));
         if (!indexesPath.exists()) {
-            indexesPath.mkdirs();
+            indexesPath.getParentFile().mkdirs();
             ParallelTasks tasks = new ParallelTasks();
             tasks.add(new DownloadFileTask(new URL(game.assetIndex.url), indexesPath.getPath()));
             tasks.go();
@@ -607,12 +609,12 @@ public class Launcher {
 
                 /* if asset doesn't exist or its hash is invalid, re-download from mojang */
                 if (!objectsPath.exists() || objectsPath.exists() && !hash.equals(CryptoEngine.fileHash(objectsPath, "SHA-1"))) {
-                    objectsPath.mkdirs();
+                    objectsPath.getParentFile().mkdirs();
                     URL object_url = new URL(String.format("%s/%s/%s", Main.getAssetsURL(), directory, hash));
                     tasks.add(new DownloadFileTask(object_url, objectsPath.getPath()));
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("Asset preparation failed for " + keyStr, e);
             }
         });
 
@@ -625,8 +627,7 @@ public class Launcher {
             Discord discord = new Discord(1061674345405100082L);
             discord.setActivity("In Partita", String.format("Playing: %s", status));
         } catch (Exception e) {
-            log.error("An error occurred with discord rich presence!");
-            e.printStackTrace();
+            log.warn("Discord Rich Presence is unavailable", e);
         }
     }
 

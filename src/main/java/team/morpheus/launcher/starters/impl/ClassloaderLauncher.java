@@ -11,11 +11,13 @@ import java.lang.invoke.MethodType;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class ClassloaderLauncher implements ILibraryManager {
 
-    private final MyLogger log = new MyLogger(ClasspathLauncher.class);
+    private final MyLogger log = new MyLogger(ClassloaderLauncher.class);
     private final MojangProduct.Game game;
     private final List<URL> paths;
 
@@ -39,7 +41,7 @@ public class ClassloaderLauncher implements ILibraryManager {
         log.info("Launching game with classloader");
 
         /* Add all url paths to class loader */
-        URLClassLoader ucl = new URLClassLoader(getPaths().toArray(new URL[getPaths().size()]));
+        IsolatedClassloader ucl = new IsolatedClassloader(getPaths().toArray(new URL[getPaths().size()]), ClassLoader.getSystemClassLoader());
         Thread.currentThread().setContextClassLoader(ucl);
         Class<?> c = ucl.loadClass(getGame().mainClass);
 
@@ -56,8 +58,44 @@ public class ClassloaderLauncher implements ILibraryManager {
             log.debug(String.format("Invoking: %s", c.getName()));
             mainMethodHandle.invokeExact(startArgs);
         } catch (Throwable e) {
-            if (e.getMessage() != null) log.error(e.getMessage());
-            e.printStackTrace();
+            log.error("Game entrypoint invocation failed", e);
+        }
+    }
+
+    /**
+     * Loads game dependencies before delegating to the launcher classloader.
+     */
+    private static final class IsolatedClassloader extends URLClassLoader {
+
+        private static final Set<String> PARENT_FIRST = new HashSet<>(Arrays.asList("java.", "javax.", "sun.", "com.sun.", "jdk.", "team.morpheus."));
+
+        private IsolatedClassloader(URL[] urls, ClassLoader parent) {
+            super(urls, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (isParentFirst(name)) return super.loadClass(name, resolve);
+
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> loaded = findLoadedClass(name);
+                if (loaded == null) {
+                    try {
+                        loaded = findClass(name);
+                    } catch (ClassNotFoundException notInGame) {
+                        loaded = super.loadClass(name, false);
+                    }
+                }
+                if (resolve) resolveClass(loaded);
+                return loaded;
+            }
+        }
+
+        private static boolean isParentFirst(String name) {
+            for (String prefix : PARENT_FIRST) {
+                if (name.startsWith(prefix)) return true;
+            }
+            return false;
         }
     }
 }
