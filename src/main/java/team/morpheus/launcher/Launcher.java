@@ -459,7 +459,7 @@ public class Launcher {
 
     private void setupNatives(MojangProduct.Game game, File nativesFolder) throws MalformedURLException {
         String os_arch = OSUtils.getOSArch();
-        boolean isArmProcessor = (os_arch.contains("arm") || os_arch.contains("aarch"));
+        boolean isArmProcessor = (os_arch.contains("arm64") || os_arch.contains("aarch64"));
         boolean isRiscVProcessor = os_arch.contains("riscv64");
 
         Set<String> downloadedNatives = new HashSet<>();
@@ -490,6 +490,7 @@ public class Launcher {
 
                 switch (OSUtils.getPlatform()) {
                     case windows:
+                        if (isArmProcessor) break;
                         if (win32 != null) downloadOnce.accept(win32.url, "windows-32");
                         if (win64 != null) downloadOnce.accept(win64.url, "windows-64");
                         if (win != null) downloadOnce.accept(win.url, "windows");
@@ -529,6 +530,14 @@ public class Launcher {
         if (isArmProcessor || isRiscVProcessor) {
             for (MojangProduct.Game.Library lib : game.libraries) {
                 switch (OSUtils.getPlatform()) {
+                    case windows:
+                        if (!isArmProcessor) break;
+                        // LWJGL 2.x
+                        if (lib.downloads.classifiers != null && lib.downloads.classifiers.natives_windows != null && lib.downloads.classifiers.natives_windows.url.contains("lwjgl-platform-2")) {
+                            downloadOnce.accept(Main.getMorpheusAPI() + "/downloads/extra-natives/lwjgl-2-windows-aarch64.zip", "lwjgl2-windows-arm");
+                            break;
+                        }
+                        break;
                     case macos:
                         if (!isArmProcessor) break;
                         // LWJGL 2.x
